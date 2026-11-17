@@ -64,7 +64,9 @@ class PredictionSQL(db.Model):
     features: Mapped[dict] = mapped_column(db.JSON, nullable=False)
     tags: Mapped[dict] = mapped_column(db.JSON)
     label: Mapped[object] = mapped_column(db.JSON, nullable=False)
-    actual: Mapped[object] = mapped_column(db.JSON, nullable=True)
+    # none_as_null: an unlabeled prediction must be SQL NULL (not JSON "null") so
+    # queries for "has an outcome" (actual IS NOT NULL) only count real feedback.
+    actual: Mapped[object] = mapped_column(db.JSON(none_as_null=True), nullable=True)
     threshold: Mapped[float] = mapped_column(db.Float, nullable=True)
     embeddings: Mapped[dict] = mapped_column(db.JSON, nullable=True)
 

@@ -149,7 +149,7 @@ def _do_arize(prediction: Prediction, model: Model) -> None:
             shap_values=_extract_shap(prediction.explanations),
             timestamp=prediction.created,
         )
-    except ArizeLogError:
+    except Exception:
         logger.exception("task_arize_inference_log_failed")
 
 

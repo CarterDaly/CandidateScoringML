@@ -208,7 +208,7 @@ def _log_arize_inference(prediction: Prediction, model: Model) -> None:
             shap_values=_extract_shap_values(prediction.explanations),
             timestamp=prediction.created,
         )
-    except ArizeLogError:
+    except Exception:
         logger.exception("arize_inference_log_failed")
 
 
@@ -221,7 +221,7 @@ def _log_arize_actual(prediction_sql, actual_label) -> None:
             model_version=prediction_sql.model.model_version,
             actual_label=actual_label,
         )
-    except ArizeLogError:
+    except Exception:
         logger.exception("arize_actual_log_failed")
 
 

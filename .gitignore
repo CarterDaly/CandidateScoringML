@@ -8,3 +8,9 @@ __pycache__/
 *.pyc
 
 .env
+# Local training and MLflow outputs
+training_data.csv
+model.pkl
+model_run_id.txt
+mlruns/
+models/

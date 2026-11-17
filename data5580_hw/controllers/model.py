@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from datetime import datetime, timezone
@@ -41,7 +42,12 @@ class ModelController:
         if not features_raw:
             return jsonify({"error": "Missing required field: features"}), 400
 
-        feature_names = [f.strip() for f in features_raw.split(",") if f.strip()]
+        try:
+            feature_names = json.loads(features_raw)
+            if not isinstance(feature_names, list):
+                raise ValueError
+        except (json.JSONDecodeError, ValueError):
+            feature_names = [f.strip() for f in features_raw.split(",") if f.strip()]
         model_type = (request.form.get("type") or "generic").strip()
         mlflow_run_id = (request.form.get("mlflow_run_id") or "").strip() or None
 

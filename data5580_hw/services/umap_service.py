@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict, Tuple
 
 from data5580_hw.models.prediction import Prediction, Model, UmapConfig
@@ -21,7 +22,15 @@ class UmapService:
 
         coords = embedding[0]
         axis_names = self._axis_names(config.n_components)
-        return {"kind": "inputs", **{axis_names[i]: float(coords[i]) for i in range(config.n_components)}}
+        # A projection fitted on too few distinct rows can return NaN; JSON columns
+        # (and Postgres in particular) reject non-finite numbers, so store 0.0 instead.
+        return {
+            "kind": "inputs",
+            **{
+                axis_names[i]: float(coords[i]) if math.isfinite(float(coords[i])) else 0.0
+                for i in range(config.n_components)
+            },
+        }
 
     def _get_or_create_umap(self, model: Model, frame, config: UmapConfig):
         cache_key = (
@@ -39,15 +48,22 @@ class UmapService:
 
         umap = self._import_umap()
         try:
-            umap_model = umap.UMAP(
+            import pandas as pd
+            min_rows = config.n_neighbors + 1
+            fit_frame = frame if len(frame) >= min_rows else pd.concat(
+                [frame] * min_rows, ignore_index=True
+            ).iloc[:min_rows]
+            umap_kwargs = dict(
                 n_neighbors=config.n_neighbors,
                 min_dist=config.min_dist,
                 n_components=config.n_components,
                 metric=config.metric,
                 random_state=config.random_state,
-                n_jobs=config.n_jobs,
             )
-            umap_model.fit(frame)
+            if config.n_jobs is not None:
+                umap_kwargs["n_jobs"] = config.n_jobs
+            umap_model = umap.UMAP(**umap_kwargs)
+            umap_model.fit(fit_frame)
         except Exception as exc:
             raise EmbeddingError("Failed to fit UMAP model.") from exc
 

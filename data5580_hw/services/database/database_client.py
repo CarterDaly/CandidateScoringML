@@ -1,5 +1,6 @@
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from sqlalchemy.orm import DeclarativeBase
 
 
@@ -29,8 +30,13 @@ def init_db(app) -> None:
             finally:
                 db.create_all()
                 db.session.commit()
+        elif db.engine.dialect.name == "postgresql":
+            # Production: create tables only if they don't exist yet. The gunicorn
+            # workers and the Celery worker all start at once against a fresh
+            # database, so serialize table creation with an advisory lock.
+            with db.engine.begin() as conn:
+                conn.execute(text("SELECT pg_advisory_xact_lock(5580)"))
+                db.metadata.create_all(bind=conn)
         else:
-            # Production (Postgres etc.): create tables only if they don't exist yet.
-            # Schema evolution is managed through Flask-Migrate / Alembic.
             db.create_all()
             db.session.commit()

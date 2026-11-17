@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 _OLLAMA_BASE_URL = "http://localhost:11434"
 _OLLAMA_MODEL = "qwen2.5:14b"
-_OLLAMA_TIMEOUT = 60
+_OLLAMA_TIMEOUT = 180  # seconds; a cold load of a 14B model can exceed a minute
 _OLLAMA_MAX_TOKENS = 600
 _DEFAULT_NEAREST_N = 5
 
@@ -70,7 +70,7 @@ class LLMService:
             response = requests.post(
                 f"{base_url}/api/chat",
                 json=payload,
-                timeout=_OLLAMA_TIMEOUT,
+                timeout=float(os.environ.get("OLLAMA_TIMEOUT", _OLLAMA_TIMEOUT)),
             )
             response.raise_for_status()
             data = response.json()

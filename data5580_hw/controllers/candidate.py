@@ -227,7 +227,7 @@ class CandidateController:
                 embedding=prediction.embeddings,
                 timestamp=prediction.created,
             )
-        except ArizeLogError:
+        except Exception:
             logger.exception("arize_inference_log_failed")
 
         return (

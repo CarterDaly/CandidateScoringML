@@ -122,3 +122,29 @@ def test_import_umap_not_installed():
     with patch.dict(sys.modules, blocked):
         with pytest.raises(EmbeddingError, match="not installed"):
             service._import_umap()
+
+
+def test_create_embedding_replaces_non_finite_coordinates(monkeypatch):
+    service = UmapService()
+
+    class NanUMAP:
+        def __init__(self, **kwargs):
+            pass
+
+        def fit(self, _frame):
+            return self
+
+        def transform(self, _frame):
+            return [[float("nan"), float("inf")]]
+
+    class NanUmapModule:
+        def UMAP(self, **kwargs):
+            return NanUMAP(**kwargs)
+
+    monkeypatch.setattr(service, "_import_umap", lambda: NanUmapModule())
+
+    model = Model(name="demo-nan", version="1", feature_names=["a", "b"])
+    prediction = Prediction(features={"a": 1, "b": 2})
+
+    embedding = service.create_embedding(model, prediction, UmapConfig())
+    assert embedding == {"kind": "inputs", "x": 0.0, "y": 0.0}

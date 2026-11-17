@@ -15,7 +15,7 @@ class ArizeService:
     Controlled via environment variables:
       ARIZE_API_KEY      - Arize API key (required when enabled)
       ARIZE_SPACE_KEY    - Arize space key (required when enabled)
-      ARIZE_ENVIRONMENT  - production | staging | development (default: development)
+      ARIZE_ENVIRONMENT  - production | staging | development (default: production)
       ARIZE_ENABLED      - true | false  (default: true)
     """
 
@@ -42,11 +42,11 @@ class ArizeService:
             return False
 
         api_key, space_key = self._get_credentials()
-        Client, ModelTypes, Environments = self._import_arize()
+        Client, ModelTypes, Environments, Embedding = self._import_arize()
 
-        env_name = environment or os.getenv("ARIZE_ENVIRONMENT", "development")
+        env_name = environment or os.getenv("ARIZE_ENVIRONMENT", "production")
         arize_env = self._resolve_environment(Environments, env_name)
-        client = Client(space_key=space_key, api_key=api_key)
+        client = Client(space_id=space_key, api_key=api_key)
 
         kwargs: Dict[str, Any] = dict(
             prediction_id=prediction_id,
@@ -62,12 +62,13 @@ class ArizeService:
         if shap_values:
             kwargs["shap_values"] = shap_values
         if embedding:
-            kwargs["embedding_features"] = {"umap": {"vector": list(embedding.values())}}
+            kwargs["embedding_features"] = {"umap": Embedding(vector=list(embedding.values()))}
         if timestamp is not None:
             kwargs["prediction_timestamp"] = int(timestamp.timestamp())
 
         try:
-            response = client.log(**kwargs)
+            future = client.log(**kwargs)
+            response = future.result()
         except Exception as exc:
             raise ArizeLogError(f"Failed to log inference to Arize: {exc}") from exc
 
@@ -96,14 +97,14 @@ class ArizeService:
             return False
 
         api_key, space_key = self._get_credentials()
-        Client, ModelTypes, Environments = self._import_arize()
+        Client, ModelTypes, Environments, _ = self._import_arize()
 
-        env_name = environment or os.getenv("ARIZE_ENVIRONMENT", "development")
+        env_name = environment or os.getenv("ARIZE_ENVIRONMENT", "production")
         arize_env = self._resolve_environment(Environments, env_name)
-        client = Client(space_key=space_key, api_key=api_key)
+        client = Client(space_id=space_key, api_key=api_key)
 
         try:
-            response = client.log(
+            future = client.log(
                 prediction_id=prediction_id,
                 model_id=model_name,
                 model_version=model_version,
@@ -111,6 +112,7 @@ class ArizeService:
                 environment=arize_env,
                 actual_label=actual_label,
             )
+            response = future.result()
         except Exception as exc:
             raise ArizeLogError(f"Failed to log actual to Arize: {exc}") from exc
 
@@ -137,20 +139,20 @@ class ArizeService:
     @staticmethod
     def _resolve_environment(Environments, env_name: str):
         mapping = {
-            "production": Environments.PRODUCTION,
-            "staging": Environments.STAGING,
-            "development": Environments.TRAINING,
+            "production": getattr(Environments, "PRODUCTION", None),
+            "staging": getattr(Environments, "VALIDATION", None),
+            "development": getattr(Environments, "TRAINING", None),
         }
-        return mapping.get(env_name.lower(), Environments.PRODUCTION)
+        return mapping.get(env_name.lower()) or Environments.PRODUCTION
 
     @staticmethod
     def _import_arize():
         try:
             from arize.api import Client  # type: ignore
-            from arize.utils.types import Environments, ModelTypes  # type: ignore
+            from arize.utils.types import Embedding, Environments, ModelTypes  # type: ignore
         except Exception as exc:
             raise ArizeLogError("Arize SDK is not installed.") from exc
-        return Client, ModelTypes, Environments
+        return Client, ModelTypes, Environments, Embedding
 
 
 arize_service = ArizeService()
